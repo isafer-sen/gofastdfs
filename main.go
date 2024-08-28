@@ -44,6 +44,9 @@ func (c *FastDFSConfig) UploadFile(file *multipart.FileHeader) (err error, fileI
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
 	_ = writer.WriteField("output", "json")
+	if c.Auth != "" {
+		_ = writer.WriteField("auth_token", c.Auth)
+	}
 	part, err := writer.CreateFormFile("file", file.Filename)
 	if err != nil {
 		return err, fileInfo
