@@ -78,18 +78,8 @@ func (c *FastDFSConfig) UploadFile(file *multipart.FileHeader) (err error, fileI
 	return json.Unmarshal(body, &fileInfo), fileInfo
 }
 
-func (c *FastDFSConfig) DeleteFile(file *multipart.FileHeader) (resp Resp) {
-	// 打开文件
-	src, err := file.Open()
-	if err != nil {
-		return Resp{
-			Data:    nil,
-			Message: err.Error(),
-			Status:  "fail",
-		}
-	}
-	defer src.Close()
-
+func (c *FastDFSConfig) DeleteFile(fileMd5 string) (resp Resp) {
+	deleteURL := c.FastDFSURL + "/group1/delete?md5=" + fileMd5
 	// 创建一个buffer来存储文件内容
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
@@ -97,26 +87,8 @@ func (c *FastDFSConfig) DeleteFile(file *multipart.FileHeader) (resp Resp) {
 	if c.Auth != "" {
 		_ = writer.WriteField("auth_token", c.Auth)
 	}
-	part, err := writer.CreateFormFile("file", file.Filename)
-	if err != nil {
-		return Resp{
-			Data:    nil,
-			Message: err.Error(),
-			Status:  "fail",
-		}
-	}
-	_, err = io.Copy(part, src)
-	if err != nil {
-		return Resp{
-			Data:    nil,
-			Message: err.Error(),
-			Status:  "fail",
-		}
-	}
-	writer.Close()
-
 	// 发送POST请求到go-fastdfs服务器
-	res, err := http.Post(c.FastDFSURL, writer.FormDataContentType(), &buf)
+	res, err := http.Post(deleteURL, writer.FormDataContentType(), &buf)
 	if err != nil {
 		return Resp{
 			Data:    nil,
