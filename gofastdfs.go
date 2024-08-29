@@ -8,6 +8,12 @@ import (
 	"net/http"
 )
 
+type Resp struct {
+	Data    any
+	Message string `json:"message"`
+	Status  string `json:"status"`
+}
+
 type FileInfo struct {
 	Domain  string `json:"domain"`
 	Md5     string `json:"md5"`
@@ -70,4 +76,71 @@ func (c *FastDFSConfig) UploadFile(file *multipart.FileHeader) (err error, fileI
 		return err, fileInfo
 	}
 	return json.Unmarshal(body, &fileInfo), fileInfo
+}
+
+func (c *FastDFSConfig) DeleteFile(file *multipart.FileHeader) (resp Resp) {
+	// 打开文件
+	src, err := file.Open()
+	if err != nil {
+		return Resp{
+			Data:    nil,
+			Message: err.Error(),
+			Status:  "fail",
+		}
+	}
+	defer src.Close()
+
+	// 创建一个buffer来存储文件内容
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	_ = writer.WriteField("output", "json")
+	if c.Auth != "" {
+		_ = writer.WriteField("auth_token", c.Auth)
+	}
+	part, err := writer.CreateFormFile("file", file.Filename)
+	if err != nil {
+		return Resp{
+			Data:    nil,
+			Message: err.Error(),
+			Status:  "fail",
+		}
+	}
+	_, err = io.Copy(part, src)
+	if err != nil {
+		return Resp{
+			Data:    nil,
+			Message: err.Error(),
+			Status:  "fail",
+		}
+	}
+	writer.Close()
+
+	// 发送POST请求到go-fastdfs服务器
+	res, err := http.Post(c.FastDFSURL, writer.FormDataContentType(), &buf)
+	if err != nil {
+		return Resp{
+			Data:    nil,
+			Message: err.Error(),
+			Status:  "fail",
+		}
+	}
+	defer res.Body.Close()
+
+	// 读取响应
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return Resp{
+			Data:    nil,
+			Message: err.Error(),
+			Status:  "fail",
+		}
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return Resp{
+			Data:    nil,
+			Message: err.Error(),
+			Status:  "fail",
+		}
+	}
+	return resp
 }
